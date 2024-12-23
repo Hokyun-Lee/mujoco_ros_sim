@@ -2,6 +2,8 @@ Standalone Mujoco Simulator
 
 based on Mujoco 3.2.7, for ubuntu
 
+WIP
+
 
 glfw3 required.
 

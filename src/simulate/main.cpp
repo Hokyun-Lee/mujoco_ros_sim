@@ -298,6 +298,9 @@ void PhysicsLoop(mj::Simulate& sim) {
         d = dnew;
         mj_forward(m, d);
 
+        initialize_mycontroller(m, d);
+        mjcb_control = mycontroller;
+
       } else {
         sim.LoadMessageClear();
       }
@@ -321,6 +324,9 @@ void PhysicsLoop(mj::Simulate& sim) {
         m = mnew;
         d = dnew;
         mj_forward(m, d);
+
+        initialize_mycontroller(m, d);
+        mjcb_control = mycontroller;
 
       } else {
         sim.LoadMessageClear();
@@ -439,8 +445,6 @@ void PhysicsThread(mj::Simulate* sim, const char* filename) {
   // request loadmodel if file given (otherwise drag-and-drop)
   if (filename != nullptr) {
     sim->LoadMessage(filename);
-    initialize_mycontroller();
-    mjcb_control = mycontroller;
     m = LoadModel(filename, *sim);
     if (m) {
       // lock the sim mutex
@@ -455,6 +459,10 @@ void PhysicsThread(mj::Simulate* sim, const char* filename) {
       const std::unique_lock<std::recursive_mutex> lock(sim->mtx);
 
       mj_forward(m, d);
+
+
+      initialize_mycontroller(m, d);
+      mjcb_control = mycontroller;
 
     } else {
       sim->LoadMessageClear();

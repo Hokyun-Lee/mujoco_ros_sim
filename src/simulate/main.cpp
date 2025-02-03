@@ -30,7 +30,7 @@
 #include "simulate.h"
 #include "array_safety.h"
 
-#include "custom.h"
+#include "ros_controller.h"
 
 #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
 
@@ -45,6 +45,9 @@ extern "C" {
   #include <unistd.h>
 #endif
 }
+std::shared_ptr<MujocoRos> g_node;
+std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> g_executor;
+// rclcpp::executors::SingleThreadedExecutor executor_;
 
 namespace {
 namespace mj = ::mujoco;
@@ -270,6 +273,15 @@ mjModel* LoadModel(const char* file, mj::Simulate& sim) {
   return mnew;
 }
 
+// wrapper for roscontroller
+void ros_sync_wrapper(const mjModel* m, mjData* d) {
+  if(rclcpp::ok())
+  {
+    g_executor->spin_once(std::chrono::nanoseconds(1000));
+    g_node->ros_sync(m, d);
+  }
+}
+
 // simulate in background thread (while rendering in main thread)
 void PhysicsLoop(mj::Simulate& sim) {
   // cpu-sim syncronization point
@@ -298,8 +310,10 @@ void PhysicsLoop(mj::Simulate& sim) {
         d = dnew;
         mj_forward(m, d);
 
-        initialize_mycontroller(m, d);
-        mjcb_control = mycontroller;
+        g_node->initialize(m, d);
+        mjcb_control = ros_sync_wrapper;
+        // initialize_roscontroller(m, d);
+        // mjcb_control = roscontroller;
 
       } else {
         sim.LoadMessageClear();
@@ -325,8 +339,10 @@ void PhysicsLoop(mj::Simulate& sim) {
         d = dnew;
         mj_forward(m, d);
 
-        initialize_mycontroller(m, d);
-        mjcb_control = mycontroller;
+        g_node->initialize(m, d);
+        mjcb_control = ros_sync_wrapper;
+        // initialize_roscontroller(m, d);
+        // mjcb_control = roscontroller;
 
       } else {
         sim.LoadMessageClear();
@@ -460,9 +476,10 @@ void PhysicsThread(mj::Simulate* sim, const char* filename) {
 
       mj_forward(m, d);
 
-
-      initialize_mycontroller(m, d);
-      mjcb_control = mycontroller;
+      g_node->initialize(m, d);
+      mjcb_control = ros_sync_wrapper;
+      // initialize_roscontroller(m, d);
+      // mjcb_control = roscontroller;
 
     } else {
       sim->LoadMessageClear();
@@ -498,6 +515,12 @@ int main(int argc, char** argv) {
   }
 #endif
 
+  rclcpp::init(argc, argv);
+  g_node = std::make_shared<MujocoRos>();
+  g_executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+  g_executor->add_node(g_node);
+
+  
   // print version, check compatibility
   std::printf("MuJoCo version %s\n", mj_versionString());
   if (mjVERSION_HEADER!=mj_version()) {
@@ -534,5 +557,10 @@ int main(int argc, char** argv) {
   sim->RenderLoop();
   physicsthreadhandle.join();
 
+  rclcpp::shutdown();
+  // destruct g_node
+  g_node.reset();
+
+  std::cout << "Simulation finished" << std::endl;
   return 0;
 }

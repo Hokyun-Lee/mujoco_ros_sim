@@ -27,7 +27,7 @@ set(MUJOCO_DEP_VERSION_lodepng
 )
 
 project(
-  mujoco_simulate
+  mujoco_ros_sim
   VERSION 3.2.7
   DESCRIPTION "MuJoCo simulate binaries"
   HOMEPAGE_URL "https://mujoco.org"
@@ -47,6 +47,9 @@ include(FindOrFetch)
 find_package(glfw3 REQUIRED)
 find_package(Threads REQUIRED)
 find_package (Eigen3 3.3 REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 # Fetch lodepng dependency.
 if(NOT TARGET lodepng)
@@ -70,9 +73,9 @@ endif()
 include_directories(
     include
     src/simulate
-    src/custom)
+    src/ros)
 
-file(GLOB LIB_MUJOCO "lib/libmujoco.so")
+file(GLOB LIB_MUJOCO "lib/libmujoco.so" "lib/libmujoco.so.3.2.6")
 
 # Simulate library
 add_library(platform_ui_adapter OBJECT)
@@ -105,66 +108,36 @@ target_compile_options(libsimulate PRIVATE ${MUJOCO_SIMULATE_COMPILE_OPTIONS})
 target_link_libraries(libsimulate PUBLIC lodepng mujoco::platform_ui_adapter ${LIB_MUJOCO})
 target_link_options(libsimulate PRIVATE ${MUJOCO_SIMULATE_LINK_OPTIONS})
 
-add_library(custom_controller src/custom/custom.cpp)
-target_link_libraries(custom_controller
+add_library(ros_controller src/ros/ros_controller.cpp)
+target_link_libraries(ros_controller
   ${LIB_MUJOCO}
   Eigen3::Eigen
 )
+ament_target_dependencies(ros_controller rclcpp std_msgs sensor_msgs)
 
-add_executable(simulate src/simulate/main.cpp src/simulate/array_safety.h ${SIMULATE_RESOURCE_FILES})
-target_compile_options(simulate PUBLIC ${MUJOCO_SIMULATE_COMPILE_OPTIONS})
+
+add_executable(mujoco_ros_sim src/simulate/main.cpp src/simulate/array_safety.h ${SIMULATE_RESOURCE_FILES})
+target_compile_options(mujoco_ros_sim PUBLIC ${MUJOCO_SIMULATE_COMPILE_OPTIONS})
 
 target_link_libraries(
-  simulate
+  mujoco_ros_sim
   libsimulate
-  custom_controller
+  ros_controller
   ${LIB_MUJOCO}
   glfw
   Threads::Threads
   lodepng
 )
 
-target_link_options(simulate PRIVATE ${MUJOCO_SIMULATE_LINK_OPTIONS})
+target_link_options(mujoco_ros_sim PRIVATE ${MUJOCO_SIMULATE_LINK_OPTIONS})
+set_target_properties(mujoco_ros_sim PROPERTIES
+  BUILD_WITH_INSTALL_RPATH TRUE
+  INSTALL_RPATH "$ORIGIN" 
+)
 
-if(_INSTALL_SIMULATE)
+install(TARGETS mujoco_ros_sim
+  DESTINATION lib/${PROJECT_NAME})
+install(FILES ${LIB_MUJOCO} DESTINATION lib/${PROJECT_NAME})
 
-  include(TargetAddRpath)
+ament_package()
 
-  # Add support to RPATH for the samples.
-  target_add_rpath(
-    TARGETS
-    simulate
-    INSTALL_DIRECTORY
-    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
-    LIB_DIRS
-    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
-    DEPENDS
-    MUJOCO_ENABLE_RPATH
-  )
-
-  install(
-    TARGETS simulate
-    EXPORT ${PROJECT_NAME}
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT simulate
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT simulate
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT simulate
-    BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT simulate
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT simulate
-  )
-
-  # if(NOT MUJOCO_SIMULATE_USE_SYSTEM_GLFW)
-  #   # We downloaded GLFW. Depending if it is a static or shared LIBRARY we might
-  #   # need to install it.
-  #   get_target_property(MJ_GLFW_LIBRARY_TYPE glfw TYPE)
-  #   if(MJ_GLFW_LIBRARY_TYPE STREQUAL SHARED_LIBRARY)
-  #     install(
-  #       TARGETS glfw
-  #       EXPORT ${PROJECT_NAME}
-  #       RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT simulate
-  #       LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT simulate
-  #       ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT simulate
-  #       PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT simulate
-  #     )
-  #   endif()
-  # endif()
-endif()

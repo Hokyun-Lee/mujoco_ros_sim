@@ -1,6 +1,7 @@
-Standalone Mujoco Simulator
+Standalone Mujoco Simulator with ROS2
 
 based on Mujoco 3.2.7, for ubuntu
+
 
 WIP
 
@@ -8,7 +9,7 @@ WIP
 glfw3 required.
 
 ```sh
-~$ sudo apt install glfw3-dev
+~$ sudo apt install libglfw3-dev
 ```
 
 How to install 

@@ -36,24 +36,49 @@ void MujocoRos::initialize(const mjModel *m, mjData *d)
     // }
 
     //get init joint status
-    joint_state_msg.position.resize(m->nq);
-    joint_state_msg.velocity.resize(m->nv);
-    joint_state_msg.effort.resize(m->nv);
+    joint_state_msg.position.resize(m->nu);
+    joint_state_msg.velocity.resize(m->nu);
+    joint_state_msg.effort.resize(m->nu);
 
     std::copy(d->qpos, d->qpos + m->nq, eq_pos.data());
     std::copy(d->qvel, d->qvel + m->nv, eq_vel.data());
     std::copy(d->qacc, d->qacc + m->nv, eq_acc.data());
+    
+    // Publish sim time
+    joint_state_msg.header.stamp.sec = (int)d->time;
+    joint_state_msg.header.stamp.nanosec = (int)((d->time - (int)d->time) * 1e9);
 
-    joint_state_msg.header.stamp = rclcpp::Time(this->now());
+    joint_state_msg.name.resize(m->nu);
 
     for ( int i=0;i<m->nu;i++)
     {
+
+        std::string buffer(m->names + m->name_actuatoradr[i]);
+        joint_state_msg.name[i] = buffer;
+
         joint_state_msg.position[i] = eq_pos[i+7];
         joint_state_msg.velocity[i] = eq_vel[i+6];
         joint_state_msg.effort[i] = eq_acc[i+6];
     }
-\
+
     joint_state_publisher_->publish(joint_state_msg);
+
+    imu_msg.header.frame_id = "base_link";
+    imu_msg.orientation.x = 0;
+    imu_msg.orientation.y = 0;
+    imu_msg.orientation.z = 0;
+    imu_msg.orientation.w = 1;
+
+    imu_msg.angular_velocity.x = 0;
+    imu_msg.angular_velocity.y = 0;
+    imu_msg.angular_velocity.z = 0;
+
+    imu_msg.linear_acceleration.x = 0;
+    imu_msg.linear_acceleration.y = 0;
+    imu_msg.linear_acceleration.z = 0;
+
+    imu_publisher_->publish(imu_msg);
+
 
 }
 
@@ -65,15 +90,14 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
     std::copy(d->qvel, d->qvel + m->nv, eq_vel.data());
     std::copy(d->qacc, d->qacc + m->nv, eq_acc.data());
 
-    joint_state_msg.header.stamp = rclcpp::Time(this->now());
-
+    joint_state_msg.header.stamp.sec = (int)d->time;
+    joint_state_msg.header.stamp.nanosec = (int)((d->time - (int)d->time) * 1e9);
     for ( int i=0;i<m->nu;i++)
     {
         joint_state_msg.position[i] = eq_pos[i+7];
         joint_state_msg.velocity[i] = eq_vel[i+6];
         joint_state_msg.effort[i] = eq_acc[i+6];
     }
-    joint_state_publisher_->publish(joint_state_msg);
 
     // executor_.spin_once(std::chrono::nanoseconds(1000000));
 
@@ -81,14 +105,50 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
     // ctrl_vec.setZero();
     // e_ctrl(12) = sin(d->time);
 
+    imu_msg.header.stamp.sec = (int)d->time;
+    imu_msg.header.stamp.nanosec = (int)((d->time - (int)d->time) * 1e9);
+    imu_msg.header.frame_id = "base_link";
+
+    imu_msg.orientation.w = eq_pos[3];
+    imu_msg.orientation.x = eq_pos[4];
+    imu_msg.orientation.y = eq_pos[5];
+    imu_msg.orientation.z = eq_pos[6];
+
+    for (int i=0; i<m->nsensor;i++)
+    {
+        if (m->sensor_type[i] == mjSENS_ACCELEROMETER)
+        {
+            imu_msg.linear_acceleration.x = d->sensordata[m->sensor_adr[i]];
+            imu_msg.linear_acceleration.y = d->sensordata[m->sensor_adr[i]+1];
+            imu_msg.linear_acceleration.z = d->sensordata[m->sensor_adr[i]+2];
+        }
+        if (m->sensor_type[i] == mjSENS_GYRO)
+        {
+            imu_msg.angular_velocity.x = d->sensordata[m->sensor_adr[i]];
+            imu_msg.angular_velocity.y = d->sensordata[m->sensor_adr[i]+1];
+            imu_msg.angular_velocity.z = d->sensordata[m->sensor_adr[i]+2];
+        }
+    }
+
+    static double prev_time = 0;
+    double current_time = d->time;
+
+    if(current_time == prev_time)
+    {
+        return;
+    }
+
+    joint_state_publisher_->publish(joint_state_msg);
+    imu_publisher_->publish(imu_msg);
 
 
     mju_copy(d->ctrl, e_ctrl.data(), m->nu);
+    prev_time = current_time;
 }
 
 void MujocoRos::joint_command_callback(const sensor_msgs::msg::JointState::SharedPtr msg)
 {  
-    RCLCPP_INFO(this->get_logger(), "Received: '%s'", msg->effort[0]);
+    // RCLCPP_INFO(this->get_logger(), "Received: '%s'", msg->effort[0]);
 
     for(int i=0;i<msg->effort.size();i++)
     {

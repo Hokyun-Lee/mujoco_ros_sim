@@ -6,6 +6,8 @@
 #include <mujoco/mjvisualize.h>
 #include <mujoco/mjxmacro.h>
 #include <mujoco/mujoco.h>
+// #include <simulate/simulate.h"
+
 #include <Eigen/Dense>
 #include <iostream>
 #include <rclcpp/rclcpp.hpp>
@@ -21,11 +23,11 @@ class MujocoRos : public rclcpp::Node
 public:
     MujocoRos();
 
-
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher_;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_command_subscriber_;
-
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sim_command_subscriber_;
 
     sensor_msgs::msg::JointState joint_state_msg;
     sensor_msgs::msg::Imu imu_msg;
@@ -39,8 +41,6 @@ public:
     void ros_sync(const mjModel *m, mjData *d);
     // void setup_executor();
     void joint_command_callback(const sensor_msgs::msg::JointState::SharedPtr msg);
-
-
 };
 
 // void initialize_roscontroller(const mjModel *m, mjData *d);

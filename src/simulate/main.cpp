@@ -312,6 +312,7 @@ void PhysicsLoop(mj::Simulate& sim) {
 
         g_node->initialize(m, d);
         mjcb_control = ros_sync_wrapper;
+        
         // initialize_roscontroller(m, d);
         // mjcb_control = roscontroller;
 

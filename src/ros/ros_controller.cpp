@@ -1,9 +1,8 @@
 #include "ros_controller.h"
 
-
 MujocoRos::MujocoRos() : rclcpp::Node("mujoco_ros")
 {
-
+    command_received = false;
     joint_state_publisher_ = this->create_publisher<sensor_msgs::msg::JointState>("/mujoco/joint_states", 10);
     imu_publisher_ = this->create_publisher<sensor_msgs::msg::Imu>("/mujoco/imu", 10);
     joint_command_subscriber_ = this->create_subscription<sensor_msgs::msg::JointState>("/mujoco/joint_command", 10, std::bind(&MujocoRos::joint_command_callback, this, std::placeholders::_1));
@@ -28,14 +27,15 @@ void MujocoRos::initialize(const mjModel *m, mjData *d)
     eq_vel.setZero(m->nv);
     eq_acc.setZero(m->nv);
 
-    
+    actuator_dof = m->nu;
+
     joint_state_msg.name.clear();
     // for (int i = 0; i < m->nu; i++)
     // {
     //     joint_state_msg.name.push_back(m->names + m->name_actuatoradr[i] * mjOBJ_SIZE);
     // }
 
-    //get init joint status
+    // get init joint status
     joint_state_msg.position.resize(m->nu);
     joint_state_msg.velocity.resize(m->nu);
     joint_state_msg.effort.resize(m->nu);
@@ -43,22 +43,22 @@ void MujocoRos::initialize(const mjModel *m, mjData *d)
     std::copy(d->qpos, d->qpos + m->nq, eq_pos.data());
     std::copy(d->qvel, d->qvel + m->nv, eq_vel.data());
     std::copy(d->qacc, d->qacc + m->nv, eq_acc.data());
-    
+
     // Publish sim time
     joint_state_msg.header.stamp.sec = (int)d->time;
     joint_state_msg.header.stamp.nanosec = (int)((d->time - (int)d->time) * 1e9);
 
     joint_state_msg.name.resize(m->nu);
 
-    for ( int i=0;i<m->nu;i++)
+    for (int i = 0; i < m->nu; i++)
     {
 
         std::string buffer(m->names + m->name_actuatoradr[i]);
         joint_state_msg.name[i] = buffer;
 
-        joint_state_msg.position[i] = eq_pos[i+7];
-        joint_state_msg.velocity[i] = eq_vel[i+6];
-        joint_state_msg.effort[i] = eq_acc[i+6];
+        joint_state_msg.position[i] = eq_pos[i + 7];
+        joint_state_msg.velocity[i] = eq_vel[i + 6];
+        joint_state_msg.effort[i] = eq_acc[i + 6];
     }
 
     joint_state_publisher_->publish(joint_state_msg);
@@ -78,25 +78,23 @@ void MujocoRos::initialize(const mjModel *m, mjData *d)
     imu_msg.linear_acceleration.z = 0;
 
     imu_publisher_->publish(imu_msg);
-
-
 }
 
 void MujocoRos::ros_sync(const mjModel *m, mjData *d)
 {
 
-    //get current joint status
+    // get current joint status
     std::copy(d->qpos, d->qpos + m->nq, eq_pos.data());
     std::copy(d->qvel, d->qvel + m->nv, eq_vel.data());
     std::copy(d->qacc, d->qacc + m->nv, eq_acc.data());
 
     joint_state_msg.header.stamp.sec = (int)d->time;
     joint_state_msg.header.stamp.nanosec = (int)((d->time - (int)d->time) * 1e9);
-    for ( int i=0;i<m->nu;i++)
+    for (int i = 0; i < m->nu; i++)
     {
-        joint_state_msg.position[i] = eq_pos[i+7];
-        joint_state_msg.velocity[i] = eq_vel[i+6];
-        joint_state_msg.effort[i] = eq_acc[i+6];
+        joint_state_msg.position[i] = eq_pos[i + 7];
+        joint_state_msg.velocity[i] = eq_vel[i + 6];
+        joint_state_msg.effort[i] = eq_acc[i + 6];
     }
 
     // executor_.spin_once(std::chrono::nanoseconds(1000000));
@@ -114,26 +112,26 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
     imu_msg.orientation.y = eq_pos[5];
     imu_msg.orientation.z = eq_pos[6];
 
-    for (int i=0; i<m->nsensor;i++)
+    for (int i = 0; i < m->nsensor; i++)
     {
         if (m->sensor_type[i] == mjSENS_ACCELEROMETER)
         {
             imu_msg.linear_acceleration.x = d->sensordata[m->sensor_adr[i]];
-            imu_msg.linear_acceleration.y = d->sensordata[m->sensor_adr[i]+1];
-            imu_msg.linear_acceleration.z = d->sensordata[m->sensor_adr[i]+2];
+            imu_msg.linear_acceleration.y = d->sensordata[m->sensor_adr[i] + 1];
+            imu_msg.linear_acceleration.z = d->sensordata[m->sensor_adr[i] + 2];
         }
         if (m->sensor_type[i] == mjSENS_GYRO)
         {
             imu_msg.angular_velocity.x = d->sensordata[m->sensor_adr[i]];
-            imu_msg.angular_velocity.y = d->sensordata[m->sensor_adr[i]+1];
-            imu_msg.angular_velocity.z = d->sensordata[m->sensor_adr[i]+2];
+            imu_msg.angular_velocity.y = d->sensordata[m->sensor_adr[i] + 1];
+            imu_msg.angular_velocity.z = d->sensordata[m->sensor_adr[i] + 2];
         }
     }
 
     static double prev_time = 0;
     double current_time = d->time;
 
-    if(current_time == prev_time)
+    if (current_time == prev_time)
     {
         return;
     }
@@ -141,21 +139,27 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
     joint_state_publisher_->publish(joint_state_msg);
     imu_publisher_->publish(imu_msg);
 
-
-    mju_copy(d->ctrl, e_ctrl.data(), m->nu);
+    if (command_received)
+        mju_copy(d->ctrl, e_ctrl.data(), m->nu);
     prev_time = current_time;
 }
 
 void MujocoRos::joint_command_callback(const sensor_msgs::msg::JointState::SharedPtr msg)
-{  
+{
     // RCLCPP_INFO(this->get_logger(), "Received: '%s'", msg->effort[0]);
 
-    for(int i=0;i<msg->effort.size();i++)
+    if (msg->effort.size() != actuator_dof)
+    {
+        std::cout << " ERR: recevied commmand has different joint size " << std::endl;
+    }
+
+    command_received = true;
+    for (int i = 0; i < msg->effort.size(); i++)
     {
         e_ctrl(i) = msg->effort[i];
     }
 
-    std::cout << "Joint command received : "<<msg->effort.size() << std::endl;
+    // std::cout << "Joint command received : "<<msg->effort.size() << std::endl;
 }
 
 // void MujocoRos::setup_executor()

@@ -32,10 +32,14 @@ public:
     sensor_msgs::msg::JointState joint_state_msg;
     sensor_msgs::msg::Imu imu_msg;
 
+    bool command_received;
+
     Eigen::VectorXd e_ctrl;
     Eigen::VectorXd eq_pos;
     Eigen::VectorXd eq_vel;
     Eigen::VectorXd eq_acc;
+
+    int actuator_dof;
 
     void initialize(const mjModel *m, mjData *d);
     void ros_sync(const mjModel *m, mjData *d);

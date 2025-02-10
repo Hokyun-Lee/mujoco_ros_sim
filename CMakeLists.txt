@@ -40,6 +40,9 @@ set(CMAKE_CXX_STANDARD 17)
 # Check if we are building as standalone project.
 set(SIMULATE_STANDALONE ON)
 
+add_compile_options(-O)
+
+
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 include(FetchContent)
@@ -75,7 +78,21 @@ include_directories(
     src/simulate
     src/ros)
 
-file(GLOB LIB_MUJOCO "lib/libmujoco.so" "lib/libmujoco.so.3.2.6")
+file(GLOB LIB_MUJOCO "lib/libmujoco.so" "lib/libmujoco.so.3.2.7")
+file(GLOB PLUGIN_MUJOCO "mujoco_plugin/libactuator.so")
+
+add_library(mujoco_data_header INTERFACE)
+target_include_directories(mujoco_data_header 
+    INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+ament_export_include_directories(include)
 
 # Simulate library
 add_library(platform_ui_adapter OBJECT)
@@ -137,7 +154,9 @@ set_target_properties(mujoco_ros_sim PROPERTIES
 
 install(TARGETS mujoco_ros_sim
   DESTINATION lib/${PROJECT_NAME})
+
 install(FILES ${LIB_MUJOCO} DESTINATION lib/${PROJECT_NAME})
+install(FILES ${PLUGIN_MUJOCO} DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
 

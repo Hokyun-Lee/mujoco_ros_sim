@@ -16,6 +16,8 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 
+#include <mujoco_data.h>
+
 using namespace std::chrono_literals;
 
 class MujocoRos : public rclcpp::Node
@@ -33,11 +35,17 @@ public:
     sensor_msgs::msg::Imu imu_msg;
 
     bool command_received;
+    int mujoco_count;
+
+    double command_time;
 
     Eigen::VectorXd e_ctrl;
+    Eigen::VectorXd m_ctrl;
     Eigen::VectorXd eq_pos;
     Eigen::VectorXd eq_vel;
     Eigen::VectorXd eq_acc;
+
+    mjtNum *ctrl_command;
 
     int actuator_dof;
 
@@ -45,6 +53,11 @@ public:
     void ros_sync(const mjModel *m, mjData *d);
     // void setup_executor();
     void joint_command_callback(const sensor_msgs::msg::JointState::SharedPtr msg);
+
+    mujoco_shm *shm;
+
+    spsc_mujoco_joint_command *joint_command_buffer;
+    spsc_mujoco_joint_status *joint_status_buffer;
 };
 
 // void initialize_roscontroller(const mjModel *m, mjData *d);

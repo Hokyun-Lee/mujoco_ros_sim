@@ -114,10 +114,22 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
     imu_msg.header.stamp.nanosec = (int)((d->time - (int)d->time) * 1e9);
     imu_msg.header.frame_id = "base_link";
 
-    imu_msg.orientation.w = eq_pos[3];
-    imu_msg.orientation.x = eq_pos[4];
-    imu_msg.orientation.y = eq_pos[5];
-    imu_msg.orientation.z = eq_pos[6];
+    if (qdiff == 0)
+    {
+
+        imu_msg.orientation.w = 1;
+        imu_msg.orientation.x = 0;
+        imu_msg.orientation.y = 0;
+        imu_msg.orientation.z = 0;
+    }
+    else
+    {
+
+        imu_msg.orientation.w = eq_pos[3];
+        imu_msg.orientation.x = eq_pos[4];
+        imu_msg.orientation.y = eq_pos[5];
+        imu_msg.orientation.z = eq_pos[6];
+    }
 
     for (int i = 0; i < m->nsensor; i++)
     {
@@ -150,7 +162,6 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
     {
         command_received = false;
         mju_copy(d->ctrl, e_ctrl.data(), m->nu);
-        
     }
     prev_time = current_time;
 }

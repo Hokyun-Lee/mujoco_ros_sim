@@ -310,6 +310,8 @@ void PhysicsLoop(mj::Simulate& sim) {
         d = dnew;
         mj_forward(m, d);
 
+        sim.run = 0;
+
         g_node->initialize(m, d);
         mjcb_control = ros_sync_wrapper;
         
@@ -339,6 +341,8 @@ void PhysicsLoop(mj::Simulate& sim) {
         m = mnew;
         d = dnew;
         mj_forward(m, d);
+
+        sim.run = 0;
 
         g_node->initialize(m, d);
         mjcb_control = ros_sync_wrapper;
@@ -476,6 +480,8 @@ void PhysicsThread(mj::Simulate* sim, const char* filename) {
       const std::unique_lock<std::recursive_mutex> lock(sim->mtx);
 
       mj_forward(m, d);
+
+      sim->run = 0;
 
       g_node->initialize(m, d);
       mjcb_control = ros_sync_wrapper;

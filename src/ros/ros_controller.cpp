@@ -50,15 +50,18 @@ void MujocoRos::initialize(const mjModel *m, mjData *d)
 
     joint_state_msg.name.resize(m->nu);
 
+    int qdiff = m->nq - m->nu;
+    int qdiff2 = m->nv - m->nu;
+
     for (int i = 0; i < m->nu; i++)
     {
 
         std::string buffer(m->names + m->name_actuatoradr[i]);
         joint_state_msg.name[i] = buffer;
 
-        joint_state_msg.position[i] = eq_pos[i + 7];
-        joint_state_msg.velocity[i] = eq_vel[i + 6];
-        joint_state_msg.effort[i] = eq_acc[i + 6];
+        joint_state_msg.position[i] = eq_pos[i + qdiff];
+        joint_state_msg.velocity[i] = eq_vel[i + qdiff2];
+        joint_state_msg.effort[i] = eq_acc[i + qdiff2];
     }
 
     joint_state_publisher_->publish(joint_state_msg);
@@ -90,11 +93,15 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
 
     joint_state_msg.header.stamp.sec = (int)d->time;
     joint_state_msg.header.stamp.nanosec = (int)((d->time - (int)d->time) * 1e9);
+
+    int qdiff = m->nq - m->nu;
+    int qdiff2 = m->nv - m->nu;
+
     for (int i = 0; i < m->nu; i++)
     {
-        joint_state_msg.position[i] = eq_pos[i + 7];
-        joint_state_msg.velocity[i] = eq_vel[i + 6];
-        joint_state_msg.effort[i] = eq_acc[i + 6];
+        joint_state_msg.position[i] = eq_pos[i + qdiff];
+        joint_state_msg.velocity[i] = eq_vel[i + qdiff2];
+        joint_state_msg.effort[i] = eq_acc[i + qdiff2];
     }
 
     // executor_.spin_once(std::chrono::nanoseconds(1000000));
@@ -140,7 +147,11 @@ void MujocoRos::ros_sync(const mjModel *m, mjData *d)
     imu_publisher_->publish(imu_msg);
 
     if (command_received)
+    {
+        command_received = false;
         mju_copy(d->ctrl, e_ctrl.data(), m->nu);
+        
+    }
     prev_time = current_time;
 }
 
